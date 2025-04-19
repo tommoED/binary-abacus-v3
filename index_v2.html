@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Table Size Control</title>
+
+    <script>
+        const Encodings = [
+            "Unsigned",
+            "2s Complement",
+            "1s Complement",
+            "Sign Bit",
+            "Endianness",
+            "Hexadecimal",
+            "ASCII",
+            "IEEE Floating Point",
+        ]
+
+
+       const registers = [0] * 32; // Storing the abacus state
+       let encoding = 0;
+    </script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 1000px;
+        }
+        
+        table {
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        tr {
+            border-top: 1px solid #ccc;
+            border-bottom: 1px solid #ccc;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f0f0f0;
+        }
+        
+        td {
+            padding: 10px;
+            text-align: center;
+            width: 40px;
+            height: 40px;
+        }
+        
+        .settings-panel {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background-color: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 20px;
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 200px;
+            transform: translateX(-90%);
+            transition: transform 0.3s ease-in-out;
+        }
+
+        .settings-panel:hover {
+            transform: translateX(0);
+        }
+
+        .control-group {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .control-group label {
+            flex: 1;
+        }
+        
+        .control-group input {
+            width: 60px;
+            padding: 5px;
+            margin-left: 10px;
+        }
+
+        .bead {
+            text-align: center;
+            padding: 10px;
+            margin: 2px;
+            width: 50px;
+            margin-top: 32px;
+            height: 15px;
+            cursor: pointer;
+            color: #fff;
+            border: 1px solid #888;
+            background-color: #333; /* natural bead color */
+            border-radius: 5px;
+            transition: transform 0.15s ease-in-out;
+            transform: translateY(0);
+            position: relative; /* ensure any absolutely positioned children are relative thereto */
+        }
+
+        .bead.active {
+            background-color: #fff;
+            transform: translateY(-30px);
+            color: #000;
+        }
+        
+        button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 15px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 14px;
+            margin: 10px 0;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+        }
+
+        /* New styling for keyboard overlay */
+        .key-label {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            font-size: 10px;
+            color: rgba(255,255,255,0.7);
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Table Size Control</h1>
+        
+        <div class="settings-panel">
+            <h2>Settings</h2>
+            <div class="control-group">
+                <label for="rows">Number of Rows:</label>
+                <input type="number" id="rows" min="1" max="32" value="3">
+            </div>
+            <div class="control-group">
+                <label for="columns">Number of Columns:</label>
+                <input type="number" id="columns" min="1" max="32" value="8">
+            </div>
+            <div class="control-group">
+                <label for="encoding">Encoding:</label>
+                <select id="encoding" onchange="updateEncoding(columnsInput.value)">
+                    <option value="0">Unsigned</option>
+                    <option value="1">2s Complement</option>
+                    <!-- <option value="1s Complement">1s Complement</option>
+                    <option value="Sign Bit">Sign Bit</option>
+                    <option value="Endianness">Endianness</option>
+                    <option value="Hexadecimal">Hexadecimal</option>
+                    <option value="ASCII">ASCII</option>
+                    <option value="IEEE Floating Point">IEEE Floating Point</option> -->
+                </select>
+            </div>
+        </div>
+        
+        <div id="table-container">
+            <table id="main-table"></table>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Get elements
+            const rowsInput = document.getElementById('rows');
+            const columnsInput = document.getElementById('columns');
+            const tableElement = document.getElementById('main-table');
+            const encodingSelect = document.getElementById('encoding');
+            
+            function updateEncoding(cols) {
+                encoding = parseInt(encodingSelect.value);
+                // Create header row if it doesn't exist
+                let header = document.getElementById('header');
+                if (!header) {
+                    header = document.createElement('tr');
+                    header.id = 'header';
+                    tableElement.appendChild(header);
+                } else {
+                    // Clear existing header
+                    header.innerHTML = '';
+                }
+                header.textContent = encoding;
+
+                header_values = [];
+                switch (encoding) {
+                    case 0:
+                        for (let i = 0; i < cols; i++) {
+                            header_values.push(2**i);
+                        }   
+                    case 1:
+                        header_values[0] = -header_values[0];
+                        break;
+                }
+                for (let i = 0; i < header_values.length; i++) {
+                    const header = document.createElement('th');
+                    header.id = 'header';
+                    header.textContent = header_values[i];
+                    tableElement.appendChild(header);
+                }
+            }
+
+            function setbead(i, j) {
+                const bead = document.getElementById(`bead-${i}-${j}`);
+                bead.classList.add('active');
+                bead.dataset.value = '1';
+                bead.textContent = '1';
+                registers[i] = registers[i] | (1 << j);
+            }
+
+            function clearbead(i, j) {
+                const bead = document.getElementById(`bead-${i}-${j}`);
+                bead.classList.remove('active');
+                bead.dataset.value = '0';
+                bead.textContent = '0';
+                registers[i] = registers[i] & ~(1 << j);
+            }
+
+            function togglebead(i, j) {
+                const bead = document.getElementById(`bead-${i}-${j}`);
+                if (bead.dataset.value === '0') {
+                    setbead(i, j);
+                } else {
+                    clearbead(i, j);
+                }
+            }
+
+            // Function to generate table
+            function generateTable(rows, cols) {
+                // Clear existing table
+                tableElement.innerHTML = '';
+                // Clear existing header
+                let header = document.getElementById('header');
+                
+                updateEncoding(cols);
+                // Generate new table
+                for (let i = 0; i < rows; i++) {
+                    
+
+
+                    const row = document.createElement('tr');
+                    
+                    for (let j = 0; j < cols; j++) {
+                        const cell = document.createElement('td');
+                        // Create a bead element
+                        const bead = document.createElement('div');
+                        bead.className = 'bead';
+                        bead.textContent = '0';
+                        bead.dataset.value = '0';
+                        
+                        // Add click event to toggle bead value
+                        bead.addEventListener('click', function() {
+                            togglebead(i, j);
+                        });
+                        
+                        cell.appendChild(bead);
+                        row.appendChild(cell); 
+                    }
+                    
+                    tableElement.appendChild(row);
+                }
+            }
+            
+            // Initialize table with default values
+            generateTable(3, 3);
+            
+            // Function to update table based on input values
+            function updateTable() {
+                const rows = parseInt(rowsInput.value) || 1;
+                const cols = parseInt(columnsInput.value) || 1;
+                
+                // Validate input
+                if (rows < 1 || rows > 20) {
+                    alert('Rows must be between 1 and 20');
+                    return;
+                }
+                
+                if (cols < 1 || cols > 20) {
+                    alert('Columns must be between 1 and 20');
+                    return;
+                }
+                
+                generateTable(rows, cols);
+            }
+            
+            // Add input event listeners to update table when inputs change
+            rowsInput.addEventListener('input', updateTable);
+            columnsInput.addEventListener('input', updateTable);
+        });
+    </script>
+</body>
+</html>
