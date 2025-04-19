@@ -1,49 +1,138 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
+
 <head>
-    <meta charset="utf-8">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Binary Abacus</title>
+    <title>Table Size Control</title>
+
+    <script>
+        const Encodings = [
+            "Unsigned",
+            "2s Complement",
+            "1s Complement",
+            "Sign Bit",
+            "Endianness",
+            "Hexadecimal",
+            "ASCII",
+            "IEEE Floating Point",
+        ]
+
+        const snapSound = new Audio('snap.wav');
+        const MAX_ROWS = 32;
+        const MAX_COLS = 32;
+
+        let beads = [];
+        let n_rows = 1;
+        let n_cols = 8;
+
+        let selection_i = 0;
+        let selection_j = 0;
+        let registers = new Array(MAX_ROWS).fill(0);
+
+        let encoding = 0;
+    </script>
     <style>
         body {
-            margin-top: 50px;
-            font-family: Arial, sans-serif;
+            font-family: 'Montserrat', 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
+            margin: 0;
+            padding: 20px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            min-width: fit-content;
-            width: 100%;
-        }
-        /* Color gradient for the abacus beads/place value indicators */
-        .column-gradient {
-            background: linear-gradient(to right, #ff0000, #cc00ff);
-            color: linear-gradient(to right, #ff0000, #cc00ff);
         }
 
-        .abacus {
-            margin-top: 20px;
+        h1 {
+            color: #555;
+            font-weight: 400;
+            margin-bottom: 20vh;
         }
-        .header, .row {
+        .container {
             display: flex;
-            margin-bottom: 10px;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 1000px;
         }
-        .header-cell, .row-total {
-            /* border: 1px solid #333; */
-            text-align: center;
-            padding: 11px;
-            margin: 2px;
+
+        table {
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            border-collapse: collapse;
+            margin: 20px 0;
         }
-        .header-cell {
-            width: 50px;
-            font-weight: bold;
-            background-color: #fcfcfc;
+
+        tr {
+            border-top: 1px solid #ccc;
+            border-bottom: 1px solid #ccc;
         }
-        .row {
-            /* border-top: 10px solid #ddd; */
-            border-bottom: 10px solid #ddd;
-        }
-        .row:nth-child(even), .row:nth-child(even) .row-total {
+
+        tr:nth-child(even) {
             background-color: #f0f0f0;
+        }
+
+        td {
+            padding: 10px;
+            text-align: center;
+            width: 40px;
+            height: 40px;
+            position: relative;
+        }
+
+        .row-total {
+            width: 100px;
+        }
+
+        .settings-panel {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background-color: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 20px;
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 200px;
+            transform: translateX(-100%);
+            transition: transform 0.3s ease-in-out;
+            z-index: 9999;
+        }
+
+        .settings-panel.open {
+            transform: translateX(0);
+        }
+
+        .settings-toggle {
+            position: absolute;
+            right: -32px;
+            top: 20px;
+            transform: translateY(-50%);
+            padding: 10px 5px;
+            cursor: pointer;
+            z-index: 10000;
+        }
+
+        .settings-panel:hover:not(.open) {
+            transform: translateX(-86%);
+        }
+
+        .control-group {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+        }
+
+        .control-group label {
+            flex: 1;
+        }
+
+        .control-group input {
+            width: 60px;
+            padding: 5px;
+            margin-left: 10px;
         }
 
         .bead {
@@ -55,56 +144,76 @@
             height: 15px;
             cursor: pointer;
             color: #fff;
-            border: 1px solid #888;
-            background-color: #333; /* natural bead color */
+            /* natural bead color */
             border-radius: 5px;
             transition: transform 0.15s ease-in-out;
             transform: translateY(0);
-            position: relative; /* ensure any absolutely positioned children are relative thereto */
+            position: relative;
+            /* ensure any absolutely positioned children are relative thereto */
+            z-index: 1;
         }
-        .blank-space {
-            width: 50px;
-            height: 50px;
-            line-height: 50px;
-            padding: 11px;
-            margin: 2px;
+
+        .bead:hover {
+            transform: translateY(-10%);
         }
+
         .bead.active {
-            background-color: #fff;
-            transform: translateY(-30px);
-            color: #000;
+            transform: translateY(-100%);
         }
-        .row-total {
-            padding-top: 25px;
-            width: 50px;
-            background-color: #ffffff;
-            font-weight: bold;
+
+        .bead.active:hover {
+            transform: translateY(-90%);
         }
-        .controls {
+
+        .bead:nth-child(n) {
+            /* Use HSL color model with calc to create a rainbow effect across columns */
+            background-color: hsl(calc(360 * ((var(--col-index, 0) / var(--total-columns, 8)) + 0.1)), 20%, 40%);
+            /* Active beads get a lighter version of the same hue */
+        }
+
+        .bead.active:nth-child(n) {
+            background-color: hsl(calc(360 * ((var(--col-index, 0) / var(--total-columns, 8)) + 0.1)), 70%, 50%);
+        }
+
+        .bead-value {
+            display: var(--show-digits);
+            pointer-events: none;
+        }
+
+        .keyboard-key {
             position: absolute;
-            top: 15px;
-            left: 15px;
-            background-color: #eeeC;
-            display: flex;
-            flex-direction: column;
-            /* color: #000; */
-            border: 1px solid #888;
-            padding: 10px;
+            top: 10px;
+            left: 10px;
+            font-size: 10px;
+            color: #000;
+            background-color: #ddd;
+            z-index: 0;
+            box-shadow: 0 5px 0 5px #ccc;
             border-radius: 5px;
+            padding: 5px 5px 2px 2px;
+            width: 20px;
+            height: 20px;
+            opacity: 0.6;
+
+            zoom: .7;
         }
-        .controls span {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            width: 100%;
-            margin-bottom: 5px;
+
+        button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 15px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 14px;
+            margin: 10px 0;
+            cursor: pointer;
+            border-radius: 4px;
         }
-        .controls label {
-            margin-right: 10px;
-        }
-        .controls input {
-            width: 50px;
-            margin-left: auto;
+
+        button:hover {
+            background-color: #45a049;
         }
 
         /* New styling for keyboard overlay */
@@ -113,296 +222,491 @@
             top: 2px;
             right: 2px;
             font-size: 10px;
-            color: rgba(255,255,255,0.7);
+            color: rgba(255, 255, 255, 0.7);
             pointer-events: none;
         }
     </style>
 </head>
+
 <body>
-    <div class="controls">
-        <span>
-            <label for="columnCount">Columns:</label>
-            <input type="number" id="columnCount" value="8" min="1">
-        </span>
-        <span>
-            <label for="rowCount">Rows:</label>
-            <input type="number" id="rowCount" value="3" min="1">
-        </span>
-        <span>
-            <label for="showDigits">Show Digits</label>
-            <input type="checkbox" id="showDigits">
-        </span>
-        <span>
-            <label for="hidePlaceValues">Hide Place Values</label>
-            <input type="checkbox" id="hidePlaceValues">
-        </span>
-        <span>
-            <button id="showKeyboard(Ctrl)">Show Keyboard</button>
-        </span>
-    </div>
-    <h1>Binary Abacus</h1>
-    <div class="abacus">
-        <!-- Abacus will be generated dynamically -->
+    <div class="container">
+        <h1>Binary Abacus</h1>
+
+        <div class="settings-panel">
+            <div class="settings-toggle">⚙️</div>
+            <h2>Settings</h2>
+            <div class="control-group">
+                <label for="rows">Number of Rows:</label>
+                <input type="number" id="rows" min="1" max="32" value="1" onchange="n_rows = parseInt(rows.value); ">
+            </div>
+            <div class="control-group">
+                <label for="columns">Number of Columns:</label>
+                <input type="number" id="columns" min="1" max="32" value="8"
+                    onchange="n_cols = parseInt(columns.value); document.documentElement.style.setProperty('--total-columns', n_cols);">
+            </div>
+            <div class="control-group">
+                <label for="encoding">Encoding:</label>
+                <select id="encoding" onchange="updateEncoding(n_cols)">
+                    <option value="0">Unsigned</option>
+                    <option value="1">2s Complement</option>
+                    <!-- <option value="2">1s Complement</option> -->
+                    <!-- <option value="3">Sign Bit</option> -->
+                    <!-- <option value="4">Endianness</option> -->
+                    <!-- <option value="5">Hexadecimal</option> -->
+                    <!-- <option value="6">ASCII</option> -->
+                    <option value="7">IEEE Floating Point</option>
+                </select>
+                <script>
+                    function updateEncoding(cols) {
+                        const header = document.getElementById('header');
+                        encoding = parseInt(document.getElementById('encoding').value);
+                        // Create header row if it doesn't exist
+                        header.textContent = encoding;
+
+                        header_values = [];
+                        switch (encoding) {
+                            case 1:
+                                header_values[0] = -Math.pow(2, cols - 1);
+                            case 0:
+                                for (let i = header_values.length; i < cols; i++) {
+                                    header_values.push(Math.pow(2, cols - i - 1));
+                                }
+                                break;
+                            case 7:
+                                header.innerHTML = '';
+                                const colsInput = document.getElementById('columns');
+                                if (n_cols == 8) {
+                                    // 8 Bit Floating Point (E3M4)
+                                    row0 = document.createElement('tr');
+                                    row0.innerHTML = '<th colspan="1">Sign</th><th colspan="3">Exponent</th><th colspan="4">Mantissa</th>';
+                                    header.appendChild(row0);
+                                    row1 = document.createElement('tr');
+                                    // Create cells for the 8-bit float format (SEEE MMMM)
+                                    // Sign bit
+                                    const signCell = document.createElement('td');
+                                    signCell.textContent = '+/-';
+                                    row1.appendChild(signCell);
+
+                                    // Exponent bits (3 bits)
+                                    for (let e = 0; e < 3; e++) {
+                                        const expCell = document.createElement('td');
+                                        expCell.textContent = 2 ** (2 - e);
+                                        row1.appendChild(expCell);
+                                    }
+
+                                    // Mantissa bits (4 bits)
+                                    for (let m = 1; m < 5; m++) {
+                                        const mantissaCell = document.createElement('td');
+                                        mantissaCell.textContent = 2 ** (-m);
+                                        row1.appendChild(mantissaCell);
+                                    }
+                                    header.appendChild(row1);
+
+                                }
+                                else if (n_cols == 16) {
+                                    // Half Precision Floating Point
+
+                                }
+                                else if (n_cols == 32) {
+                                    // Single Precision Floating Point
+                                    // | Sign | Exponent | Mantissa (Fraction) |
+                                    // | 1 bit | 8 bits | 23 bits |
+                                    row0 = document.createElement('tr');
+                                    row0.innerHTML = '<th colspan="1">Sign</th><th colspan="8">Exponent</th><th colspan="23">Mantissa</th>';
+                                    header.appendChild(row0);
+                                    row1 = document.createElement('tr');
+                                    for (let i = 0; i < 23; i++) {
+                                    // Create cells for the IEEE 754 Single Precision format
+                                    // First create the sign bit cell
+                                    const signCell = document.createElement('td');
+                                    signCell.textContent = 'S';
+                                    row1.appendChild(signCell);
+                                    
+                                    // Create the 8 exponent bit cells
+                                    for (let e = 0; e < 8; e++) {
+                                        const expCell = document.createElement('td');
+                                        expCell.textContent = `E${7-e}`;
+                                        row1.appendChild(expCell);
+                                    }
+                                    
+                                    // Create the 23 mantissa bit cells
+                                    for (let m = 0; m < 23; m++) {
+                                        const mantissaCell = document.createElement('td');
+                                        mantissaCell.textContent = `M${22-m}`;
+                                        row1.appendChild(mantissaCell);
+                                    }
+                                    }
+                                    header.appendChild(row1);
+                                    
+                                } else {
+                                    colsInput.value = 8;
+                                    colsInput.dispatchEvent(new Event('change'));
+                                }
+                                return;
+                        }
+                        header.innerHTML = '';
+                        for (let i = 0; i < header_values.length; i++) {
+                            const cell = document.createElement('th');
+                            cell.textContent = header_values[i];
+                            header.appendChild(cell);
+                        }
+                    }
+                </script>
+            </div>
+            <div class="control-group">
+                <label for="showDigits">Show Digits:</label>
+                <input type="checkbox" id="showDigits"
+                    onchange="document.documentElement.style.setProperty('--show-digits', showDigits.checked ? 'block' : 'none');">
+            </div>
+            <div class="control-group">
+                <label for="showKeys">Show Keys:</label>
+                <input type="checkbox" id="showKeys" onchange="updateKeyDisplay()" checked={false}>
+                <script>
+                    function updateKeyDisplay() {
+                        const showKeys = document.getElementById('showKeys').checked;
+                        document.querySelectorAll('.keyboard-key').forEach(function (key) {
+                            key.style.display = showKeys ? 'block' : 'none';
+                        });
+                    }
+                </script>
+            </div>
+        </div>
+
+        <div id="table-container">
+            <table id="abacus">
+                <thead id="header"></thead>
+            </table>
+        </div>
     </div>
 
     <script>
-        let registers = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];   
-        let columns = 8;
-        let rows = 2;
-        const snapSound = new Audio('snap.mp3');
-        // Function to generate the abacus dynamically based on the number of columns
-        function generateAbacus(columns, rows) {
-            const abacusEl = document.querySelector('.abacus');
-            let html = '';
-            // Generate the header row with binary place values (descending order)
-            html += '<div class="header">';
-            for (let i = columns - 1; i >= 0; i--) {
-                const value = Math.pow(2, i);
-                html += `<div class="header-cell">${document.getElementById('hidePlaceValues').checked ? '' : value}</div>`;
-            }
-            // for the first column, 
-            html += '<div class="header-cell">Total</div></div>';
 
-            // Create 3 rows by default, each with the specified number of beads
-            for (let r = 0; r < rows; r++) {
-                html += '<div class="row">';
-                for (let i = columns - 1; i >= 0; i--) {
-                    const value = Math.pow(2, i);
-                    html += `<div class="bead" data-value="${value}" data-bit="0">${document.getElementById('showDigits').checked ? "0" : ""}</div>`;
-                }
-                html += '<div class="row-total">0</div></div>';
-            }
+        document.addEventListener('DOMContentLoaded', function () {
+            // Get elements
+            const rowsInput = document.getElementById('rows');
+            const columnsInput = document.getElementById('columns');
+            const abacus = document.getElementById('abacus');
+            const encodingSelect = document.getElementById('encoding');
+            const showDigitsCheckbox = document.getElementById('showDigits');
+            const settingsPanel = document.querySelector('.settings-panel');
 
-            abacusEl.innerHTML = html;
-        }
+            // Toggle settings panel
+            settingsPanel.addEventListener('click', function() {
+                settingsPanel.classList.toggle('open');
+            });
 
-        // Update the decimal total for a given row by summing the values of active beads.
-        function updateRowTotal(row) {
-            let total = 0;
-            row.querySelectorAll('.bead').forEach(function(bead) {
-                if (bead.dataset.bit === "1") {
-                    total += parseInt(bead.dataset.value, 10);
+            // Close settings panel when clicking outside
+            document.addEventListener('click', function(event) {
+                if (!settingsPanel.contains(event.target)) {
+                    settingsPanel.classList.remove('open');
                 }
             });
-            row.querySelector('.row-total').textContent = total;
+
+            // Function to generate table
+            function generateTable(n_rows, n_cols) {
+                abacus.innerHTML = '<thead id="header"></thead>';
+
+                abacus.id = 'abacus';
+                beads = [];
+
+
+                updateEncoding(n_cols);
+
+                for (let i = 0; i < n_rows; i++) {
+
+                    const rowElement = document.createElement('tr');
+                    // Prepend the cell element to the row
+                    for (let j = 0; j < n_cols; j++) {
+                        const cell = document.createElement('td');
+                        // Create a bead element
+                        const bead = document.createElement('div');
+                        bead.className = 'bead';
+                        bead.innerHTML = '<span class="bead-value">0</span>';
+                        bead.dataset.bit = registers[i] & (1 << j);
+                        bead.dataset.row = i;
+                        bead.dataset.col = j;
+                        bead.style.setProperty('--col-index', j);
+                        cell.appendChild(bead);
+
+                        const keyElement = document.createElement('div');
+                        if (n_rows > 1) {
+                            keyElement.textContent = keyboardMap[i][j - (n_cols - keyboardMap[0].length)];
+                        } else {
+                            // USE QWERTY for default
+                            keyElement.textContent = keyboardMap[1][j - (n_cols - keyboardMap[0].length)];
+                        }
+                        keyElement.classList.add('keyboard-key');
+
+                        // Handle swipe action on bead
+                        bead.addEventListener('mouseover', function (event) {
+                            if (isMouseDown) {
+                                if (!visitedBeads.has(event.target)) {
+                                    visitedBeads.add(event.target);
+                                    applySwipeAction(event.target, swipeAction, i, j);
+                                }
+                                updateRowTotal(i);
+                            }
+                        });
+
+                        bead.addEventListener('mousedown', function (event) {
+                            event.preventDefault();
+                            isMouseDown = true;
+                            visitedBeads = new WeakSet();
+                            if (event.button === 0) { // Primary button
+                                swipeAction = event.target.dataset.bit === "1" ? "unset" : "set";
+                                applySwipeAction(event.target, swipeAction, i, j);
+
+
+                            } else if (event.button === 2) { // Secondary button
+                                swipeAction = "toggle";
+                                applySwipeAction(event.target, swipeAction, i, j);
+                            }
+                            updateRowTotal(i);
+                        });
+
+                        document.addEventListener('keydown', function (event) {
+                            if (n_rows > 1) {
+                                if (event.key === keyboardMap[i][j - (n_cols - keyboardMap[0].length)]) {
+                                    applySwipeAction(bead, keyModifier, i, j);
+                                    updateRowTotal(i);
+                                }
+                            } else {
+                                if (event.key === keyboardMap[1][j - (n_cols - keyboardMap[0].length)]) {
+                                    applySwipeAction(bead, keyModifier, i, j);
+                                    updateRowTotal(i);
+                                }
+                            }
+                        });
+
+                        cell.appendChild(keyElement);
+
+                        beads.push(bead);
+                        rowElement.prepend(cell);
+
+                    }
+                    const rowTotal = document.createElement('td');
+                    rowTotal.className = 'row-total';
+                    rowTotal.textContent = registers[i];
+                    rowElement.appendChild(rowTotal);
+
+                    abacus.appendChild(rowElement);
+                }
+            }
+
+            // Initialize table with default values
+            generateTable(n_rows, n_cols);
+
+            // Function to update table based on input values
+            function updateTable() {
+                const rows = parseInt(rowsInput.value) || 1;
+                const cols = parseInt(columnsInput.value) || 1;
+
+                if (rows > MAX_ROWS) {
+                    rows = MAX_ROWS;
+                }
+                if (cols > MAX_COLS) {
+                    cols = MAX_COLS;
+                }
+
+                generateTable(rows, cols);
+            }
+
+            // Add input event listeners to update table when inputs change
+            rowsInput.addEventListener('input', updateTable);
+            columnsInput.addEventListener('input', updateTable);
+        });
+
+        function updateRowTotal(i) {
+            const rowTotal = document.querySelectorAll('.row-total')[i];
+            switch (encoding) {
+                case 1:
+                    msb = 1 << (n_cols - 1);
+                    rowTotal.textContent = - (registers[i] & msb) + (registers[i] & ~msb);
+                    break;
+                case 7:
+                    console.log("Experimental floating point mode");
+                    // Convert the IEEE 754 bit pattern to a floating point number
+                    switch (n_cols) {
+                        case 8:
+                            // 8 Bit Floating Point (E3M4)
+                            const bias8 = 3; // 2^(3-1) - 1
+
+                            switch (registers[i]) {
+                                case 0x00:
+                                    rowTotal.textContent = "0";
+                                    return;
+                                case 0x80:
+                                    rowTotal.textContent = "-0";
+                                    return;
+                                case 0x7F:
+                                    rowTotal.textContent = "Infinity";
+                                    return;
+                                case 0xFF:
+                                    rowTotal.textContent = "-Infinity";
+                                    return;
+                            }
+                            const signBit8 = (registers[i] & 0x80) >>> 7;
+                            const exponentBits8 = (registers[i] & 0x70) >>> 4;
+                            const mantissaBits8 = registers[i] & 0x0F;
+                            const sign8 = (signBit8 === 1) ? -1 : 1;
+
+                            let floatValue8;
+                            switch (exponentBits8) {
+                                case 0b000: // Zero or Denormalized
+                                    if (mantissaBits8 === 0) {
+                                        floatValue8 = sign8 * 0; // Handle +0 and -0
+                                    } else {
+                                        // Denormalized: value = sign * 0.MMMM * 2^(1-bias)
+                                        floatValue8 = sign8 * (mantissaBits8 / 16.0) * Math.pow(2, 1 - bias8);
+                                    }
+                                    break;
+                                case 0b111: // Infinity or NaN (all 1s exponent)
+                                    if (mantissaBits8 === 0) {
+                                        floatValue8 = sign8 * Infinity;
+                                    } else {
+                                        floatValue8 = NaN;
+                                    }
+                                    break;
+                                default: // Normalized number
+                                    // value = sign * 1.MMMM * 2^(exponent - bias)
+                                    const actualExponent8 = exponentBits8 - bias8;
+                                    floatValue8 = sign8 * (1 + mantissaBits8 / 16.0) * Math.pow(2, actualExponent8);
+                                    break;
+                            }
+
+
+                            rowTotal.textContent = "2^(1 - " + exponentBits8 + ") * (1 + " + mantissaBits8 / 16.0 + ") = " + floatValue8.toPrecision(3);
+                            return;
+                    }
+                default:
+                    rowTotal.textContent = registers[i];
+            }
         }
 
-        document.getElementById('columnCount').addEventListener('change', function() {
-            const newColumns = parseInt(document.getElementById('columnCount').value);
-            if (isNaN(newColumns) || newColumns < 1) {
-                alert("Please enter a valid number of columns (minimum 1).");
-                return;
-            }
-            columns = newColumns;
-            generateAbacus(columns, rows);
-        });
 
-        document.getElementById('rowCount').addEventListener('change', function() {
-            const newRows = parseInt(document.getElementById('rowCount').value);
-            if (isNaN(newRows) || newRows < 1) {
-                alert("Please enter a valid number of rows (minimum 1).");
-                return;
-            }
-            rows = newRows;
-            generateAbacus(columns, rows);
-        });
+        // ==== Begin Swipe and Keyboard Input Functionality ====
 
-        
-        // Initialize the abacus with the default 8 columns.
-        generateAbacus(columns, rows);
+        // ----- Keyboard Input -----
+        const keyboardMatrix = [
+            "1234567890",
+            "qwertyuiop",
+            "asdfghjkl:",
+            "zxcvbnm,./",
+        ]
 
-        // Update beads' text when the Show Digits checkbox is toggled.
-        document.getElementById('showDigits').addEventListener('change', function() {
-            const show = this.checked;
-            document.querySelectorAll('.bead').forEach(function(bead) {
-                bead.textContent = show ? (bead.dataset.bit === "1" ? "1" : "0") : '';
-            });
-        });
+        const keyboardMap = keyboardMatrix.map(row => row.split('').reverse());
 
-        // --- Begin Swipe and Keyboard Input Functionality ---
 
-        // Global variables for swipe input
+
+        // ----- Swipe Input -----
         let isMouseDown = false;
-        let swipeAction = "";
         let visitedBeads = new WeakSet();
+        let swipeAction = "";
 
-        // Function to apply an action to a bead (used in swipe and keyboard)
-        function applySwipeAction(bead, action) {
+        function setbead(bead, row, col) {
+            bead.classList.add('active');
+            bead.dataset.bit = 1;
+            bead.innerHTML = '<span class="bead-value">1</span>';
+            snapSound.play();
+            registers[row] |= (1 << col);
+        }
+
+        function clearbead(bead, row, col) {
+            bead.classList.remove('active');
+            bead.dataset.bit = 0;
+            bead.innerHTML = '<span class="bead-value">0</span>';
+            snapSound.play();
+            registers[row] &= ~(1 << col);
+        }
+
+        function togglebead(bead, row, col) {
+            if (bead.dataset.bit === "0") {
+                setbead(bead, row, col);
+            } else {
+                clearbead(bead, row, col);
+            }
+        }
+
+        function applySwipeAction(bead, action, row, col) {
             const originalBit = bead.dataset.bit;
             if (action === "set") {
-                bead.classList.add('active');
-                bead.dataset.bit = "1";
+                setbead(bead, row, col);
             } else if (action === "unset") {
-                bead.classList.remove('active');
-                bead.dataset.bit = "0";
+                clearbead(bead, row, col);
             } else if (action === "toggle") {
-                if (bead.classList.contains('active')) {
-                    bead.classList.remove('active');
-                    bead.dataset.bit = "0";
-                } else {
-                    bead.classList.add('active');
-                    bead.dataset.bit = "1";
-                }
+                togglebead(bead, row, col);
             }
             if (originalBit !== bead.dataset.bit) {
                 snapSound.currentTime = 0;
                 snapSound.play();
             }
-            if(document.getElementById('showDigits').checked) {
-                bead.textContent = bead.dataset.bit === "1" ? "1" : "0";
-            } else {
-                bead.textContent = "";
-            }
-            updateRowTotal(bead.closest('.row'));
         }
 
-        const abacusEl = document.querySelector('.abacus');
+        // ----- Modifier Keys -----
+        let keyModifier = "toggle";
+        window.addEventListener("keydown", function (e) {
+            if (e.key === "ArrowUp") {
+                keyModifier = "set";
+            } else if (e.key === "ArrowDown") {
+                keyModifier = "unset";
+            } else if (e.shiftKey) {
+                e.preventDefault();
+                keyModifier = "set";
+            } else if (e.key === "Tab") {
+                e.preventDefault();
+                keyModifier = "unset";
+            } else if (e.key === "Backspace") {
+                // Clear all beads when Escape is pressed
+                document.querySelectorAll('.bead').forEach(bead => {
+                    applySwipeAction(bead, "unset");
+                });
+                for (let i = 0; i < n_rows; i++) {
+                    registers[i] = 0;
+                    updateRowTotal(i);
+                }
+            } else if (e.key === "\\") {
+                // Toggle all beads when # is pressed
+                document.querySelectorAll('.bead').forEach(bead => {
+                    applySwipeAction(bead, "toggle");
+                });
+                for (let i = 0; i < n_rows; i++) {
+                    registers[i] ^= (2 ** n_cols - 1);
+                    updateRowTotal(i);
+                }
+            } else if (e.key === "Enter") {
+                // Toggle all beads when Enter is pressed
+                registers.fill(Math.pow(2, n_cols) - 1);
+                document.querySelectorAll('.bead').forEach(bead => {
+                    applySwipeAction(bead, "set");
+                });
+                for (let i = 0; i < n_rows; i++) {
+                    registers[i] = Math.pow(2, n_cols) - 1;
+                    updateRowTotal(i);
+                }
+            }
+        });
+
+        window.addEventListener("keyup", function (e) {
+            if (e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "Shift" || e.key === "Tab") {
+                keyModifier = "toggle";
+            }
+        });
 
         // Prevent the context menu so right-click can be used for toggling
-        abacusEl.addEventListener('contextmenu', function(event) {
+        abacus.addEventListener('contextmenu', function (event) {
             event.preventDefault();
         });
 
-        // Mouse down event: start swipe action on a bead
-        abacusEl.addEventListener('mousedown', function(event) {
-            if (event.target.classList.contains('bead')) {
-                event.preventDefault();
-                isMouseDown = true;
-                visitedBeads = new WeakSet();
-                if (event.button === 0) { // Primary button
-                    swipeAction = event.target.classList.contains('active') ? "unset" : "set";
-                    applySwipeAction(event.target, swipeAction);
-                } else if (event.button === 2) { // Secondary button
-                    swipeAction = "toggle";
-                    applySwipeAction(event.target, swipeAction);
-                }
-            }
-        });
-
-        // Mouse over event: if swiping, apply the current swipeAction to new beads
-        abacusEl.addEventListener('mouseover', function(event) {
-            if (isMouseDown && event.target.classList.contains('bead')) {
-                if (!visitedBeads.has(event.target)) {
-                    visitedBeads.add(event.target);
-                    applySwipeAction(event.target, swipeAction);
-                }
-            }
-        });
 
         // Mouse up: end the swipe action
-        window.addEventListener('mouseup', function(event) {
+        window.addEventListener('mouseup', function (event) {
             isMouseDown = false;
             visitedBeads = new WeakSet();
             swipeAction = "";
         });
 
-        // Keyboard input: map key rows to beads in each row
-        const keyMap = ["qwertyuiop", "asdfghjkl;", "zxcvbnm,.", "1234567890"];
 
-        // New: Use Up and Down arrow keys as modifiers.
-        // When the up arrow is held, we'll set (activate) beads.
-        // When the down arrow is held, we'll unset (clear) beads.
-        let keyModifier = "";
-        window.addEventListener("keydown", function(e) {
-            if(e.key === "ArrowUp") {
-                keyModifier = "set";
-            } else if(e.key === "ArrowDown") {
-                keyModifier = "unset";
-            } else if(e.shiftKey) {
-                e.preventDefault();
-                keyModifier = "set";
-            } else if(e.key === "Tab") {
-                e.preventDefault();
-                keyModifier = "unset";
-            } else if(e.key === "Backspace") {
-                // Clear all beads when Escape is pressed
-                document.querySelectorAll('.bead').forEach(bead => {
-                    applySwipeAction(bead, "unset");
-                });
-            } else if(e.key === "#") {
-                // Toggle all beads when # is pressed
-                document.querySelectorAll('.bead').forEach(bead => {
-                    applySwipeAction(bead, "toggle");
-                });
-            } else if(e.key === "Enter") {
-                // Toggle all beads when Enter is pressed
-                document.querySelectorAll('.bead').forEach(bead => {
-                    applySwipeAction(bead, "set");
-                });
-            }
-        });
-
-        window.addEventListener("keyup", function(e) {
-            if(e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "Shift" || e.key === "Tab") {
-                keyModifier = "";
-            }
-        });
-
-        window.addEventListener("keydown", function(event) {
-            let key = event.key.toLowerCase();
-            keyMap.forEach((rowKeys, rowIndex) => {
-                let pos = rowKeys.indexOf(key);
-                if (pos !== -1 && rowIndex < rows) {
-                    const rowElements = document.querySelectorAll('.abacus .row');
-                    if (rowElements[rowIndex]) {
-                        let beads = rowElements[rowIndex].querySelectorAll('.bead');
-                        if (pos < beads.length) {
-                            pos = pos + beads.length -8;
-                            let bead = beads[pos];
-                            let action = "toggle";
-                            if (keyModifier.length) {
-                                action = keyModifier;
-                            }
-                            applySwipeAction(bead, action);
-                        }
-                    }
-                }
-            });
-        }, {capture: true});
-
-        // --- End Swipe and Keyboard Input Functionality ---
-
-        // Toggle keyboard overlay for beads when "Show Keyboard" button is clicked.
-        let keyboardOverlay = false;
-        document.getElementById('showKeyboard(Ctrl)').addEventListener('click', function() {
-            keyboardOverlay = !keyboardOverlay;
-            this.textContent = keyboardOverlay ? "Hide Keyboard" : "Show Keyboard";
-            updateKeyboardOverlay(keyboardOverlay);
-        });
-
-        function updateKeyboardOverlay(showOverlay) {
-            // Get all rows in the abacus
-            const rowElements = document.querySelectorAll('.abacus .row');
-            rowElements.forEach((rowElement, rowIndex) => {
-                // Get the beads in this row.
-                const beads = rowElement.querySelectorAll('.bead');
-                // Calculate offset (if there are more than 8 columns, mapping starts at index = beads.length - 8)
-                const offset = beads.length > 8 ? beads.length - 8 : 0;
-                beads.forEach((bead, beadIndex) => {
-                    // Remove any existing key-label to avoid duplicates.
-                    const existingLabel = bead.querySelector('.key-label');
-                    if (existingLabel) {
-                        existingLabel.remove();
-                    }
-                    // If overlay is turned on and a mapping exists for this row...
-                    if (showOverlay && rowIndex < keyMap.length) {
-                        const keyStr = keyMap[rowIndex]; // e.g. "qwertyui"
-                        const keyIndex = beadIndex - offset;
-                        if (keyIndex >= 0 && keyIndex < keyStr.length) {
-                            const letter = keyStr[keyIndex];
-                            const label = document.createElement('span');
-                            label.className = 'key-label';
-                            label.textContent = letter;
-                            bead.appendChild(label);
-                        }
-                    }
-                });
-            });
-        }
-
-        document.getElementById('hidePlaceValues').addEventListener('change', function() {
-            generateAbacus(columns, rows);
-        });
     </script>
 </body>
-</html> 
+
+</html>
