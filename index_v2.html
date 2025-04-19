@@ -18,6 +18,9 @@
         ]
 
 
+         let beads = [];
+         const rows = 1;
+         const cols = 8;
        const registers = [0] * 32; // Storing the abacus state
        let encoding = 0;
     </script>
@@ -131,11 +134,9 @@
             cursor: pointer;
             border-radius: 4px;
         }
-        
         button:hover {
             background-color: #45a049;
         }
-
         /* New styling for keyboard overlay */
         .key-label {
             position: absolute;
@@ -149,13 +150,13 @@
 </head>
 <body>
     <div class="container">
-        <h1>Table Size Control</h1>
+        <h1>Binary Abacus</h1>
         
         <div class="settings-panel">
             <h2>Settings</h2>
             <div class="control-group">
                 <label for="rows">Number of Rows:</label>
-                <input type="number" id="rows" min="1" max="32" value="3">
+                <input type="number" id="rows" min="1" max="32" value="1">
             </div>
             <div class="control-group">
                 <label for="columns">Number of Columns:</label>
@@ -192,15 +193,6 @@
             function updateEncoding(cols) {
                 encoding = parseInt(encodingSelect.value);
                 // Create header row if it doesn't exist
-                let header = document.getElementById('header');
-                if (!header) {
-                    header = document.createElement('tr');
-                    header.id = 'header';
-                    tableElement.appendChild(header);
-                } else {
-                    // Clear existing header
-                    header.innerHTML = '';
-                }
                 header.textContent = encoding;
 
                 header_values = [];
@@ -214,15 +206,12 @@
                         break;
                 }
                 for (let i = 0; i < header_values.length; i++) {
-                    const header = document.createElement('th');
-                    header.id = 'header';
                     header.textContent = header_values[i];
-                    tableElement.appendChild(header);
                 }
             }
 
             function setbead(i, j) {
-                const bead = document.getElementById(`bead-${i}-${j}`);
+                const bead = beads[cols * i + j];
                 bead.classList.add('active');
                 bead.dataset.value = '1';
                 bead.textContent = '1';
@@ -230,7 +219,7 @@
             }
 
             function clearbead(i, j) {
-                const bead = document.getElementById(`bead-${i}-${j}`);
+                const bead = beads[cols * i + j];
                 bead.classList.remove('active');
                 bead.dataset.value = '0';
                 bead.textContent = '0';
@@ -238,7 +227,9 @@
             }
 
             function togglebead(i, j) {
-                const bead = document.getElementById(`bead-${i}-${j}`);
+                console.log((cols) * i + j);
+                console.log(beads);
+                const bead = beads[(cols) * (i - 1) + j];
                 if (bead.dataset.value === '0') {
                     setbead(i, j);
                 } else {
@@ -250,9 +241,14 @@
             function generateTable(rows, cols) {
                 // Clear existing table
                 tableElement.innerHTML = '';
+                tableElement.id = 'tableElement';
                 // Clear existing header
-                let header = document.getElementById('header');
+                beads = [];
                 
+                header = document.createElement('th');
+                header.id = 'header';
+
+
                 updateEncoding(cols);
                 // Generate new table
                 for (let i = 0; i < rows; i++) {
@@ -260,6 +256,7 @@
 
 
                     const row = document.createElement('tr');
+                    
                     
                     for (let j = 0; j < cols; j++) {
                         const cell = document.createElement('td');
@@ -275,6 +272,7 @@
                         });
                         
                         cell.appendChild(bead);
+                        beads.push(bead);
                         row.appendChild(cell); 
                     }
                     
@@ -283,7 +281,7 @@
             }
             
             // Initialize table with default values
-            generateTable(3, 3);
+            generateTable(rows, cols);
             
             // Function to update table based on input values
             function updateTable() {
